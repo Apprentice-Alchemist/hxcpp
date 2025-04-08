@@ -1,13 +1,11 @@
 <xml>
 
-<echo value="Using iOS SDK ${IPHONE_VER}" if="VERBOSE"/>
-
 <set name="HXCPP_CPP11" value="1" unless="HXCPP_NO_CPP11 || HXCPP_CPP17" />
 
 <set name="ARCH" value ="-64" if="HXCPP_M64" />
 
 <set name="HXCPP_USE_LIBTOOL" value="1" />
-<set name="HXCPP_LIBTOOL" value="xcrun --sdk iphonesimulator${IPHONE_VER} libtool" />
+<set name="HXCPP_LIBTOOL" value="xcrun --sdk iphonesimulator libtool"/>
 <include name="toolchain/gcc-toolchain.xml"/>
 <!--<path name="${DEVELOPER_DIR}/Platforms/iPhoneSimulator.platform/Developer/usr/bin" />-->
 
@@ -18,8 +16,8 @@
 <set name="OBJDBG" value="-dbg" if="debug" />
 
 <compiler id="iPhoneSim" exe="g++" if="iphonesim">
-  <exe name="xcrun --sdk iphonesimulator${IPHONE_VER} g++" if="HXCPP_GCC" />
-  <exe name="xcrun --sdk iphonesimulator${IPHONE_VER} clang++" />
+  <exe name="xcrun --sdk iphonesimulator g++"/>
+  <exe name="xcrun --sdk iphonesimulator clang++" if="HXCPP_CLANG"/>
   <flag value="-c"/>
   <!-- Removed for iOS 8 -->
   <!-- <cppflag value="-fvisibility-inlines-hidden"/> -->
@@ -55,11 +53,9 @@
   <flag value="-arch"/>
   <flag value="i386" unless="HXCPP_M64"/>
   <flag value="x86_64" if="HXCPP_M64"/>
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator${IPHONE_VER}.sdk"/>
   <!-- Removed for iOS 8 -->
   <!-- <flag value="-fvisibility=hidden"/> -->
-  <!-- <flag value="-miphoneos-version-min=${IPHONE_VER}"/> -->
+  <!-- <flag value="-miphoneos-version-min="/> -->
   <flag value="-miphoneos-version-min=9.0" unless="HXCPP_IOS_MIN_VERSION" />
   <flag value="-miphoneos-version-min=${HXCPP_IOS_MIN_VERSION}" if="HXCPP_IOS_MIN_VERSION" />
   <flag value="-DIPHONE=IPHONE"/>
@@ -87,8 +83,8 @@
 </compiler>
 
 <linker id="dll" exe="g++" >
-  <exe name="xcrun --sdk iphonesimulator${IPHONE_VER} g++" if="HXCPP_GCC" />
-  <exe name="xcrun --sdk iphonesimulator${IPHONE_VER} clang++" />
+  <exe name="xcrun --sdk iphonesimulator g++"/>
+  <exe name="xcrun --sdk iphonesimulator clang++" if="HXCPP_CLANG"/>
   <cppflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
   <cppflag value="-stdlib=libc++" if="HXCPP_CPP11 || HXCPP_CPP17" />
   <mmflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
@@ -97,8 +93,6 @@
   <flag value="-arch"/>
   <flag value="i386" unless="HXCPP_M64"/>
   <flag value="x86_64" if="HXCPP_M64"/>
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator${IPHONE_VER}.sdk"/>
   <flag value="-Wl,-undefined,dynamic_lookup"/>
   <flag value="-fpic"/>
   <flag value="-fPIC"/>

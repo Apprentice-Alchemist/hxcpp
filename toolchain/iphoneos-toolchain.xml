@@ -1,8 +1,5 @@
 <xml>
 
-
-<echo value="Using iOS SDK ${IPHONE_VER}" if="VERBOSE"/>
-
 <set name="HXCPP_CPP11" value="1" unless="HXCPP_NO_CPP11 || HXCPP_CPP17" />
 
 <set name="ARCH" value ="-v7" if="HXCPP_ARMV7" />
@@ -10,7 +7,7 @@
 <set name="ARCH" value ="-64" if="HXCPP_ARM64" />
 
 <set name="HXCPP_USE_LIBTOOL" value="1" />
-<set name="HXCPP_LIBTOOL" value="xcrun --sdk iphoneos${IPHONE_VER} libtool" />
+<set name="HXCPP_LIBTOOL" value="xcrun --sdk iphoneos libtool"/>
 <include name="toolchain/gcc-toolchain.xml"/>
 <!--<path name="${DEVELOPER_DIR}/Platforms/iPhoneOS.platform/Developer/usr/bin" />-->
 
@@ -24,8 +21,8 @@
 
 
 <compiler id="iPhoneOS" exe="g++" if="iphoneos">
-  <exe name="xcrun --sdk iphoneos${IPHONE_VER} g++" if="HXCPP_GCC" />
-  <exe name="xcrun --sdk iphoneos${IPHONE_VER} clang++" />
+  <exe name="xcrun --sdk iphoneos g++" if="HXCPP_GCC" />
+  <exe name="xcrun --sdk iphoneos clang++"/>
   <flag value="-c"/>
   <!-- Removed for iOS 8 -->
   <!-- <cppflag value="-fvisibility-inlines-hidden"/> -->
@@ -48,8 +45,6 @@
   <flag value="armv7" if="HXCPP_ARMV7" />
   <flag value="armv7s" if="HXCPP_ARMV7S" />
   <flag value="arm64" if="HXCPP_ARM64" />
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS${IPHONE_VER}.sdk"/>
   <!-- <flag value="-miphoneos-version-min=3.0" if="HXCPP_GCC" unless="HXCPP_ARMV7" />
   <flag value="-miphoneos-version-min=5.0" if="HXCPP_ARMV7" /> -->
   <flag value="-miphoneos-version-min=9.0" unless="HXCPP_IOS_MIN_VERSION" />
@@ -92,8 +87,8 @@
 </compiler>
 
 <linker id="dll" exe="g++" >
-  <exe name="xcrun --sdk iphoneos${IPHONE_VER} g++" if="HXCPP_GCC" />
-  <exe name="xcrun --sdk iphoneos${IPHONE_VER} clang++" />
+  <exe name="xcrun --sdk iphoneos g++" if="HXCPP_GCC" />
+  <exe name="xcrun --sdk iphoneos clang++" />
   <flag value="-Wl,-cache_path_lto,/tmp" if="HXCPP_OPTIMIZE_LINK_INCREMENTAL" unless="debug"/>
   <cppflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
   <cppflag value="-stdlib=libc++" if="HXCPP_CPP11 || HXCPP_CPP17" />
@@ -105,8 +100,6 @@
   <flag value="armv7" if="HXCPP_ARMV7" />
   <flag value="armv7s" if="HXCPP_ARMV7S" />
   <flag value="arm64" if="HXCPP_ARM64" />
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS${IPHONE_VER}.sdk"/>
   <flag value="-Wl,-undefined,dynamic_lookup"/>
   <flag value="-fpic"/>
   <flag value="-fPIC"/>

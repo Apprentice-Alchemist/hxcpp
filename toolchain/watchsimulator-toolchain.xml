@@ -1,7 +1,4 @@
 <xml>
-
-<echo value="Using WatchSimulator SDK ${WATCHOS_VER}" if="VERBOSE"/>
-
 <set name="HXCPP_USE_LIBTOOL" value="1" />
 <set name="HXCPP_LIBTOOL" value="xcrun --toolchain WatchSimulator libtool" />
 <include name="toolchain/gcc-toolchain.xml"/>
@@ -28,9 +25,6 @@
   <flag value="-stdlib=libc++" if="HXCPP_CPP11" />
   <flag value="-std=c++11" if="HXCPP_CPP11" />
   <flag value="-g" />
-
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/WatchSimulator.platform/Developer/SDKs/WatchSimulator${WATCHOS_VER}.sdk"/>
 
   <flag value="-fapplication-extension" />
 

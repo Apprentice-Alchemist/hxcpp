@@ -1,7 +1,4 @@
 <xml>
-
-<echo value="Using WatchOS SDK ${WATCHOS_VER}" if="VERBOSE"/>
-
 <set name="HXCPP_USE_LIBTOOL" value="1" />
 <set name="HXCPP_LIBTOOL" value="xcrun --toolchain WatchOS libtool" />
 <include name="toolchain/gcc-toolchain.xml"/>
@@ -29,9 +26,6 @@
   <flag value="-std=c++11" if="HXCPP_CPP11" />
 
   <flag value="-g" />
-
-  <flag value="-isysroot"/>
-  <flag value="${DEVELOPER_DIR}/Platforms/WatchOS.platform/Developer/SDKs/WatchOS${WATCHOS_VER}.sdk"/>
 
   <flag value="-fapplication-extension" />
 
