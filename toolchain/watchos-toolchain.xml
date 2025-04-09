@@ -7,7 +7,7 @@
 <set name="HXCPP_CPP11" value="1" />
 <set name="OBJDBG" value="-dbg" if="debug" />
 
-<compiler id="WatchOS" exe="clang" >
+<compiler id="WatchOS" exe="clang++" >
   <exe name="xcrun --toolchain WatchOS clang++" />
   <flag value="-c"/>
 
@@ -52,9 +52,9 @@
   <flag value="-fembed-bitcode" />
   <flag value="-fembed-bitcode-marker" if="debug" />
   <flag value="-Wno-parentheses" />
-  <flag value="-Wno-null-dereference" unless="HXCPP_GCC"/>
+  <flag value="-Wno-null-dereference"/>
   <flag value="-Wno-unused-value" />
-  <flag value="-Wno-bool-conversion" unless="HXCPP_GCC"/>
+  <flag value="-Wno-bool-conversion"/>
   <include name="toolchain/common-defines.xml" />
   <flag value="-I${HXCPP}/include"/>
 

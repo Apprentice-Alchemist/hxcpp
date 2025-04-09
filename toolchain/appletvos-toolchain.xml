@@ -7,39 +7,30 @@
 <include name="toolchain/gcc-toolchain.xml"/>
 <!--<path name="${DEVELOPER_DIR}/Platforms/iPhoneOS.platform/Developer/usr/bin" />-->
 
-<set name="FORCE_LIBGCC" value="1" if="HXCPP_IOS_STDCPP" unless="HXCPP_GCC" />
 <set name="OBJGCC" value="-c11" if="HXCPP_CPP11" />
-<set name="OBJGCC" value="-gcc" if="HXCPP_GCC" />
 <set name="OBJDBG" value="-dbg" if="debug" />
 
 
-<compiler id="AppleTVOS" exe="g++" if="appletvos">
-  <exe name="xcrun --sdk appletvos g++" if="HXCPP_GCC" />
+<compiler id="AppleTVOS" exe="clang++" if="appletvos">
   <exe name="xcrun --sdk appletvos clang++" />
   <flag value="-c"/>
   <!-- Removed for iOS 8 -->
   <!-- <cppflag value="-fvisibility-inlines-hidden"/> -->
   <pchflag value="-x" />
   <pchflag value="c++-header" />
-  <cppflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
-  <cppflag value="-stdlib=libc++" if="HXCPP_CPP11" />
-  <mmflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
-  <mmflag value="-stdlib=libc++" if="HXCPP_CPP11" />
   <flag value="-g" if="HXCPP_DEBUG_LINK"/>
   <flag value="-O2" unless="debug"/>
   <flag value="-arch"/>
   <flag value="arm64" if="HXCPP_ARM64" />
-  <!-- <flag value="-miphoneos-version-min=3.0" if="HXCPP_GCC" unless="HXCPP_ARMV7" />
-  <flag value="-miphoneos-version-min=5.0" if="HXCPP_ARMV7" /> -->
-  <flag value="-mappletvos-version-min=9.0" unless="HXCPP_GCC" />
+  <flag value="-mappletvos-version-min=9.0"/>
   <flag value="-fobjc-arc" if="OBJC_ARC" />
   <flag value="-DOBJC_ARC" if="OBJC_ARC" />
   <flag value="-Wno-parentheses" />
-  <flag value="-Wno-null-dereference" unless="HXCPP_GCC"/>
+  <flag value="-Wno-null-dereference"/>
   <flag value="-Wno-unused-value" />
   <flag value="-Wno-overflow" />
   <cppflag value="-Wno-invalid-offsetof" />
-  <flag value="-Wno-bool-conversion" unless="HXCPP_GCC"/>
+  <flag value="-Wno-bool-conversion"/>
   <!-- Removed for iOS 8 -->
   <!-- <flag value="-fvisibility=hidden"/> -->
   <flag value="-fno-stack-protector"/>
@@ -63,13 +54,8 @@
   <objdir value="obj/appletvos${OBJGCC}${OBJDBG}${ARCH}/" />
 </compiler>
 
-<linker id="dll" exe="g++" >
-  <exe name="xcrun --sdk appletvos g++" if="HXCPP_GCC" />
+<linker id="dll" exe="clang++" >
   <exe name="xcrun --sdk appletvos clang++" />
-  <cppflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
-  <cppflag value="-stdlib=libc++" if="HXCPP_CPP11" />
-  <mmflag value="-stdlib=libstdc++" if="FORCE_LIBGCC" />
-  <mmflag value="-stdlib=libc++" if="HXCPP_CPP11" />
   <flag value="-dynamiclib"/>
   <flag value="-arch"/>
   <flag value="arm64" if="HXCPP_ARM64" />

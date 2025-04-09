@@ -7,7 +7,7 @@
 <set name="HXCPP_CPP11" value="1" />
 <set name="OBJDBG" value="-dbg" if="debug" />
 
-<compiler id="WatchSimulator" exe="clang" >
+<compiler id="WatchSimulator" exe="clang++" >
   <exe name="xcrun --toolchain WatchSimulator clang++" />
   <flag value="-c"/>
 
@@ -48,9 +48,9 @@
   <flag value="-fobjc-arc"  />
   <flag value="-DOBJC_ARC" />
   <flag value="-Wno-parentheses" />
-  <flag value="-Wno-null-dereference" unless="HXCPP_GCC"/>
+  <flag value="-Wno-null-dereference"/>
   <flag value="-Wno-unused-value" />
-  <flag value="-Wno-bool-conversion" unless="HXCPP_GCC"/>
+  <flag value="-Wno-bool-conversion"/>
   <include name="toolchain/common-defines.xml" />
   <flag value="-I${HXCPP}/include"/>
 
