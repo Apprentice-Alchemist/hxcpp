@@ -465,6 +465,74 @@ inline int _hx_atomic_store(volatile int *a, int value) {
 #endif
 }
 
+template <class T> inline T *_hx_atomic_load(T *volatile *a) {
+#if defined(HX_GCC_ATOMICS)
+  T *ret;
+  __atomic_load(a, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HX_MSVC_ATOMICS)
+  return (T *)_InterlockedCompareExchangePointer((void *volatile *)a, NULL, NULL);
+#else
+  return *a;
+#endif
+}
+
+template<class T> inline T* _hx_atomic_store(T* volatile* a, T* value) {
+#if defined(HX_GCC_ATOMICS)
+  __atomic_store(a, &value, __ATOMIC_SEQ_CST);
+  return value;
+#elif defined(HX_MSVC_ATOMICS)
+  _InterlockedExchangePointer((void *volatile *)a, value);
+  return value;
+#else
+  *a = value;
+  return value;
+#endif
+  return value;
+}
+
+template<class T> inline T* _hx_atomic_exchange(T* volatile* a, T* value) {
+#if defined(HX_GCC_ATOMICS)
+  T *ret;
+  __atomic_exchange(a, &value, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HX_MSVC_ATOMICS)
+  _InterlockedExchangePointer((void *volatile *)a, value);
+  return value;
+#else
+  T* ret = *a;
+  *a = value;
+  return ret;
+#endif
+}
+
+template<class T> inline bool _hx_atomic_compare_exchange_weak(T *volatile*a, T **expected,
+                                             T *replacement) {
+#if defined(HX_GCC_ATOMICS)
+  return __atomic_compare_exchange(a, expected,
+                            &replacement, true,
+                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#elif defined(HX_MSVC_ATOMICS)
+  T* orig = (T*)_InterlockedCompareExchangePointer((void *volatile *)a, replacement,
+                                            *expected);
+   bool success = orig == *expected;
+   *expected = orig;
+   return success;
+#else
+  void *old = *a;
+  if (old == expected) {
+    *a = replacement;
+  }
+  return old;
+#endif
+}
+
+template <class T>
+inline bool _hx_atomic_compare_exchange_weak(volatile T **a, T **expected,
+                                        T *replacement) {
+   return _hx_atomic_compare_exchange_weak((T* volatile*)a, expected, replacement);
+}
+
 inline void* _hx_atomic_compare_exchange_ptr(volatile void **a, void *expected, void* replacement) {
 #if defined(HX_GCC_ATOMICS)
    void* _expected = expected;
@@ -473,14 +541,138 @@ inline void* _hx_atomic_compare_exchange_ptr(volatile void **a, void *expected, 
 #elif defined(HX_MSVC_ATOMICS)
   return _InterlockedCompareExchangePointer((void *volatile *)a, replacement, expected);
 #else
-   void *old = *a;
-   *a = replacement;
-   return old;
+  void *old = *a;
+  if (old == expected) {
+    *a = replacement;
+  }
+  return old;
 #endif
 }
 
 inline void* _hx_atomic_compare_exchange_cast_ptr(void *a, void *expected, void *replacement) {
    return _hx_atomic_compare_exchange_ptr((volatile void **)a, expected, replacement);
+}
+
+#if defined(HXCPP_CPP11)
+#define HX_USE_CPP_ATOMIC
+#include <atomic>
+#endif
+
+struct AtomicObject: hx::Object {
+#ifdef HX_USE_CPP_ATOMIC
+  std::atomic<::hx::Object *> aPtr;
+#else
+  ::hx::Object *aPtr;
+#endif
+
+  AtomicObject(Dynamic val) { aPtr = val.mPtr; }
+
+  void __Mark(hx::MarkContext *__inCtx) {
+    Dynamic ptr = load();
+    HX_MARK_MEMBER(ptr);
+  }
+
+#ifdef HXCPP_VISIT_ALLOCS
+   void __Visit(hx::VisitContext *__inCtx) {
+#ifdef HX_USE_CPP_ATOMIC
+     hx::Object *obj = aPtr.load();
+     HX_VISIT_MEMBER(obj);
+     aPtr.store(obj);
+#else
+      hx::Object *obj = _hx_atomic_load(&aPtr);
+      HX_VISIT_MEMBER(obj);
+      _hx_atomic_store(&aPtr, obj);
+#endif
+   }
+#endif
+
+   Dynamic store(Dynamic val) {
+#ifdef HX_USE_CPP_ATOMIC
+     aPtr.store(val.mPtr);
+#else
+     _hx_atomic_store(&aPtr, val.mPtr);
+#endif
+     HX_OBJ_WB_GET(this, val.mPtr);
+     return val;
+   }
+
+   Dynamic load() {
+#ifdef HX_USE_CPP_ATOMIC
+     return aPtr.load();
+#else
+     return _hx_atomic_load(&aPtr);
+#endif
+   }
+
+   Dynamic exchange(Dynamic val) {
+      #ifdef HX_USE_CPP_ATOMIC
+      Dynamic ret = aPtr.exchange(val.mPtr);
+      #else
+      Dynamic ret = _hx_atomic_exchange(&aPtr, val.mPtr);
+      #endif
+      HX_OBJ_WB_GET(this, val.mPtr);
+      return ret;
+   }
+
+   Dynamic compareExchange(Dynamic expected, Dynamic replacement) {
+#ifdef HX_USE_CPP_ATOMIC
+     hx::Object *original = aPtr.load();
+     while (original == expected) {
+       if (aPtr.compare_exchange_weak(original, replacement.mPtr)) {
+         HX_OBJ_WB_GET(this, replacement.mPtr);
+         return original;
+       } else {
+         continue;
+       }
+     }
+     return original;
+#else
+     hx::Object *original = _hx_atomic_load(&aPtr);
+
+     while (original == expected) {
+       if(_hx_atomic_compare_exchange_weak<hx::Object>(&aPtr, &original, replacement.mPtr)) {
+         HX_OBJ_WB_GET(this, replacement.mPtr);
+         return original;
+       } else {
+         continue;
+       }
+     }
+     return original;
+#endif
+   }
+};
+#undef HX_USE_CPP_ATOMIC
+
+inline Dynamic __hxcpp_atomic_object_create(Dynamic value) {
+   return new AtomicObject(value);
+}
+
+inline Dynamic __hxcpp_atomic_object_store(Dynamic dynObj, Dynamic val) {
+  AtomicObject *obj = dynamic_cast<AtomicObject *>(dynObj.mPtr);
+  if (!obj)
+    throw HX_INVALID_OBJECT;
+   return obj->store(val);
+}
+
+inline Dynamic __hxcpp_atomic_object_load(Dynamic dynObj) {
+  AtomicObject *obj = dynamic_cast<AtomicObject *>(dynObj.mPtr);
+  if (!obj)
+    throw HX_INVALID_OBJECT;
+   return obj->load();
+}
+
+inline Dynamic __hxcpp_atomic_object_exchange(Dynamic dynObj, Dynamic newVal) {
+  AtomicObject *obj = dynamic_cast<AtomicObject *>(dynObj.mPtr);
+  if (!obj)
+    throw HX_INVALID_OBJECT;
+   return obj->exchange(newVal);
+}
+
+inline Dynamic __hxcpp_atomic_object_compare_exchange(Dynamic dynObj, Dynamic expected, Dynamic replacement) {
+  AtomicObject *obj = dynamic_cast<AtomicObject *>(dynObj.mPtr);
+  if (!obj)
+    throw HX_INVALID_OBJECT;
+  return obj->compareExchange(expected, replacement);
 }
 
 Array<String> __hxcpp_get_call_stack(bool inSkipLast);
