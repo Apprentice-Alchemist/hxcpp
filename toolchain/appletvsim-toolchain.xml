@@ -42,7 +42,7 @@
   <mmflag value="-fobjc-legacy-dispatch"/>
   <flag value="-Wno-unused-variable"/>
   <flag value="-arch"/>
-  <flag value="x86_64" />
+  <flag value="${HXCPP_ARCH}" />
   <flag value="-isysroot"/>
   <flag value="${DEVELOPER_DIR}/Platforms/AppleTVSimulator.platform/Developer/SDKs/AppleTVSimulator${TVOS_VER}.sdk"/>
   <!-- Removed for iOS 8 -->
@@ -84,8 +84,7 @@
   <mmflag value="-stdlib=libc++" if="HXCPP_CPP11" />
   <flag value="-dynamiclib"/>
   <flag value="-arch"/>
-  <flag value="i386" unless="HXCPP_M64"/>
-  <flag value="x86_64" if="HXCPP_M64"/>
+  <flag value="${HXCPP_ARCH}" />
   <flag value="-isysroot"/>
   <flag value="${DEVELOPER_DIR}/Platforms/AppleTVSimulator.platform/Developer/SDKs/AppleTVSimulator${TVOS_VER}.sdk"/>
   <flag value="-Wl,-undefined,dynamic_lookup"/>

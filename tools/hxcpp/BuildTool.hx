@@ -65,9 +65,9 @@ class BuildTool
    var mNvccFlags:Array<String>;
    var mNvccLinkFlags:Array<String>;
    var mDirtyList:Array<String>;
-   var arm64:Bool;
-   var m64:Bool;
-   var m32:Bool;
+
+   var targetArch: Null<Arch> = null;
+   var hostArch: Arch;
 
    public static var os="";
    public static var sAllowNumProcs = true;
@@ -131,32 +131,8 @@ class BuildTool
 
       instance = this;
 
-      m64 = mDefines.exists("HXCPP_M64");
-      m32 = mDefines.exists("HXCPP_M32");
-      arm64 = mDefines.exists("HXCPP_ARM64");
-      var otherArmArchitecture = mDefines.exists("HXCPP_ARMV6") || mDefines.exists("HXCPP_ARMV7") || mDefines.exists("HXCPP_ARMV7S");
-      if (m64==m32 && !arm64 && !otherArmArchitecture)
-      {
-         var arch = mDefines.get("HXCPP_ARCH");
-         if (arch!=null)
-         {
-            m64 = arch=="x86_64";
-            m32 = arch=="x86";
-            arm64 = arch=="arm64";
-         }
-         else
-         {
-            var hostArch = getArch();
-
-            // Default to the current OS version.  windowsArm runs m32 code too
-            m64 = hostArch=="m64";
-            m32 = hostArch=="m32";
-            arm64 = hostArch=="arm64";
-         }
-
-         mDefines.remove(m32 ? "HXCPP_M64" : "HXCPP_M32");
-         set64(mDefines,m64,arm64);
-      }
+      targetArch = Arch.ArchTools.fromFlags(mDefines);
+      hostArch = getArch();
 
       Profile.setEntry("parse xml");
 
@@ -1333,43 +1309,45 @@ class BuildTool
       return result;
    }
 
-   private static function getArch():String
+   private static function getArch():Arch
    {
       if (isWindows)
       {
          if (isWindowsArm)
-            return "arm64";
+            return Arm64;
          var architecture = Sys.getEnv("PROCESSOR_ARCHITECTURE");
          var wow64Architecture = Sys.getEnv("PROCESSOR_ARCHITEW6432");
          if (architecture.indexOf("64") > -1 || wow64Architecture != null && wow64Architecture.indexOf("64") > -1)
          {
-            return "m64";
+            return X86_64;
          }
          else
          {
-            return "m32";
+            return X86;
          }
       }
       else
       {
          var process = new Process("uname", [ "-m" ]);
-         var output = process.stdout.readAll().toString();
-         var error = process.stderr.readAll().toString();
+         var output = process.stdout.readAll().toString().toLowerCase();
+         var error = process.stderr.readAll().toString().toLowerCase();
          process.exitCode();
          process.close();
 
          if ( (output.indexOf("aarch64") > -1) ||  (output.indexOf("arm64") > -1) )
          {
-            return "arm64";
+            return Arm64;
          }
-         else if (output.indexOf("64") > -1)
+         else if ((output.indexOf("x86_64") > -1) || (output.indexOf("amd64") > -1))
          {
-            return "m64";
+            return X86_64;
          }
-         else
+         else if (output.contains("i686") || output.contains("i386"))
          {
-            return "m32";
-         }
+            return X86;
+         } else {
+            return Other(output.trim());
+         };
       }
    }
 
@@ -1650,7 +1628,7 @@ class BuildTool
 
       isRPi = isLinux && Setup.isRaspberryPi();
 
-      is64 = getArch()!="m32";
+      is64 = getArch() != X86;
       var dirtyList = new Array<String>();
 
       var a = 0;
@@ -1872,8 +1850,109 @@ class BuildTool
       Log.println("");
    }
 
+   static function set64(outDefines:Hash<String>, arch: Arch) {
+      switch (arch) {
+         case Arm64:
+            outDefines.set("HXCPP_ARM64", "1");
+            outDefines.set("HXCPP_M64", "1");
+         case X86_64:
+            outDefines.set("HXCPP_M64", "1");
+         case X86:
+            outDefines.set("HXCPP_M32", "1");
+         default:
+            Log.error('Unknown architecture: $arch');
+      }
+   }
+
+   function selectMacArch(defines: Hash<String>, fallbackToHost: Bool) {
+      var arch = targetArch;
+      if (arch == null && fallbackToHost) {
+         arch = hostArch;
+      }
+      if (arch == null) {
+         Log.error("Please specify an architecture when cross-compiling");
+      }
+
+      switch (arch) {
+         case Arm64:
+            defines.set("HXCPP_ARCH", "arm64");
+				defines.set("HXCPP_ARM64", "1");
+				defines.set("HXCPP_M64", "1");
+            defines.set("BINDIR", "MacArm64");
+         case X86_64:
+            defines.set("HXCPP_ARCH", "x86_64");
+				defines.set("HXCPP_M64", "1");
+            defines.set("BINDIR", "Mac64");
+         case X86:
+            defines.set("HXCPP_ARCH", "i686");
+				defines.set("HXCPP_M32", "1");
+            defines.set("BINDIR", "Mac");
+         default:
+            Log.error('Unsupported architecture: $arch');
+      }
+      set64(defines, arch);
+   }
+
+   function selectAppleArch(defines: Hash<String>, defaultArch: Arch) {
+      var arch = targetArch != null ? targetArch : defaultArch;
+      defines.set("HXCPP_ARCH", arch.toDarwin());
+      // The following flags are used in finish-setup.xml to set LIBEXTRA
+      switch arch {
+         case Arm64:
+            defines.set("HXCPP_ARM64", "1");
+				defines.set("HXCPP_M64", "1");
+         case X86_64:
+				defines.set("HXCPP_M64", "1");
+         case X86:
+				defines.set("HXCPP_M32", "1");
+         case Armv7:
+				defines.set("HXCPP_ARMV7", "1");
+         case Armv7s:
+				defines.set("HXCPP_ARMV7S", "1");
+         default:
+      }
+   }
+
+   function selectLinuxArch(defines: Hash<String>, fallbackToHost: Bool) {
+      var bindir = "Linux";
+      var arch = targetArch;
+      if (arch == null && fallbackToHost) {
+         arch = hostArch;
+      }
+      if (arch == null) {
+         Log.error("Please specify an architecture when cross-compiling");
+      }
+      switch (arch) {
+         case X86_64:
+            defines.set("HXCPP_M64", "1");
+            bindir = "Linux64";
+         case X86:
+            defines.set("HXCPP_M32", "1");
+         case Arm64:
+            defines.set("noM32", "1");
+            defines.set("noM64", "1");
+            defines.set("HXCPP_ARM64", "1");
+            bindir = "Linux64";
+         case Armv7:
+            defines.set("noM32", "1");
+            defines.set("noM64", "1");
+            defines.set("HXCPP_ARMV7", "1");
+         default:
+            defines.set("noM32", "1");
+            defines.set("noM64", "1");
+      }
+      defines.set("BINDIR", bindir);
+   }
+
    function setDefaultToolchain(defines:Hash<String>)
    {
+      // Remove all the arch related defines
+      // the right flags will be added back based on the selected toolchain
+
+      mDefines.remove("HXCPP_ARCH");
+      for (flag in Arch.ArchTools.archFlags.keys()) {
+         mDefines.remove(flag);
+      }
       if ( (new EReg("window","i")).match(os) )
          defines.set("windows_host","1");
 
@@ -1883,6 +1962,7 @@ class BuildTool
          defines.set("iphone","iphone");
          defines.set("apple","apple");
          defines.set("BINDIR","iPhone");
+         selectAppleArch(defines, Arm64);
       }
       else if (defines.exists("iphonesim"))
       {
@@ -1890,6 +1970,7 @@ class BuildTool
          defines.set("iphone","iphone");
          defines.set("apple","apple");
          defines.set("BINDIR","iPhone");
+         selectAppleArch(defines, hostArch);
       }
       else if (defines.exists("appletvos"))
       {
@@ -1897,6 +1978,7 @@ class BuildTool
          defines.set("appletv","appletv");
          defines.set("apple","apple");
          defines.set("BINDIR","AppleTV");
+         selectAppleArch(defines, Arm64);
       }
       else if (defines.exists("appletvsim"))
       {
@@ -1904,6 +1986,7 @@ class BuildTool
          defines.set("appletv","appletv");
          defines.set("apple","apple");
          defines.set("BINDIR","AppleTV");
+         selectAppleArch(defines, hostArch);
       }
       else if (defines.exists("watchos"))
       {
@@ -1911,6 +1994,7 @@ class BuildTool
          defines.set("apple","apple");
          defines.set("applewatch","applewatch");
          defines.set("BINDIR","watchos");
+         selectAppleArch(defines, Arm64_32);
       }
       else if (defines.exists("watchsimulator"))
       {
@@ -1918,6 +2002,14 @@ class BuildTool
          defines.set("applewatch","applewatch");
          defines.set("apple","apple");
          defines.set("BINDIR","watchsimulator");
+         selectAppleArch(defines, hostArch);
+      }
+      else if (defines.exists("macos"))
+      {
+         defines.set("toolchain", "mac");
+         defines.set("macos", "macos");
+         defines.set("apple", "apple");
+         selectMacArch(defines, false);
       }
 
       else if (defines.exists("android"))
@@ -1925,6 +2017,10 @@ class BuildTool
          defines.set("toolchain","android");
          defines.set("android","android");
          defines.set("BINDIR","Android");
+         if (targetArch == null) {
+            Log.error("Please set a target architecture (one of HXCPP_ARM64, HXCPP_X86_64, HXCPP_ARMV7, HXCPP_X86)");
+         }
+         defines.set(targetArch.getAndroidFlag(), "1");
 
          if (!defines.exists("ANDROID_HOST"))
          {
@@ -1983,11 +2079,16 @@ class BuildTool
       }
       else if (defines.exists("cygwin") || defines.exists("HXCPP_CYGWIN"))
       {
-         set64(defines,m64);
+         var arch = targetArch != null ? targetArch : hostArch;
+         set64(defines, arch);
          defines.set("toolchain","cygwin");
          defines.set("cygwin","cygwin");
          defines.set("linux","linux");
-         defines.set("BINDIR",m64 ? "Cygwin64":"Cygwin");
+         var bindir = switch arch {
+            case X86_64: "Cygwin64";
+            case _: "Cygwin";
+         }
+         defines.set("BINDIR", bindir);
       }
       else if ( (new EReg("window","i")).match(os) )
       {
@@ -2004,9 +2105,15 @@ class BuildTool
          }
          else
          {
-            set64(defines,m64,arm64);
+            var arch = targetArch != null ? targetArch : hostArch;
+            set64(defines, arch);
             defines.set("windows","windows");
-            defines.set("BINDIR",arm64 ? "WindowsArm64" : m64 ? "Windows64":"Windows");
+            var bindir = switch arch {
+               case Arm64: "WindowsArm64";
+               case X86_64: "Windows64";
+               case _: "Windows";
+            }
+            defines.set("BINDIR", bindir);
 
             // Choose between MSVC and MINGW
             var useMsvc = true;
@@ -2033,7 +2140,7 @@ class BuildTool
             {
                defines.set("toolchain","msvc");
                if ( defines.exists("winrt") )
-                  defines.set("BINDIR",m64 ? "WinRT64":"WinRT");
+                  defines.set("BINDIR", arch == X86_64 ? "WinRT64":"WinRT");
             }
             else
             {
@@ -2052,40 +2159,31 @@ class BuildTool
       }
       else if ( (new EReg("linux","i")).match(os) )
       {
-         set64(defines,m64,arm64);
+         var arch = targetArch != null ? targetArch : hostArch;
+         set64(defines, arch);
+
          // Cross-compile?
          if(defines.exists("windows"))
          {
             defines.set("toolchain","mingw");
             defines.set("mingw", "mingw");
             defines.set("xcompile","1");
-            defines.set("BINDIR", arm64 ? "WindowsArm64" : m64 ? "Windows64":"Windows");
+            var bindir = switch arch {
+               case Arm64: "WindowsArm64";
+               case X86_64: "Windows64";
+               case _: "Windows";
+            }
+            defines.set("BINDIR", bindir);
          }
          else
          {
             defines.set("toolchain","linux");
             defines.set("linux","linux");
-
-            if (defines.exists("HXCPP_LINUX_ARMV7"))
-            {
-               defines.set("noM32","1");
-               defines.set("noM64","1");
-               defines.set("HXCPP_ARMV7","1");
-               m64 = false;
-            }
-            else if (arm64 || defines.exists("HXCPP_LINUX_ARM64"))
-            {
-               defines.set("noM32","1");
-               defines.set("noM64","1");
-               defines.set("HXCPP_ARM64","1");
-               m64 = true;
-            }
-            defines.set("BINDIR", m64 ? "Linux64":"Linux");
+            selectLinuxArch(defines, true);
          }
       }
       else if ( (new EReg("mac","i")).match(os) )
       {
-         set64(defines,m64, arm64);
          // Cross-compile?
          if (defines.exists("linux"))
          {
@@ -2093,14 +2191,14 @@ class BuildTool
             defines.set("linux","linux");
             defines.set("toolchain","linux");
             defines.set("xcompile","1");
-            defines.set("BINDIR", m64 ? "Linux64":"Linux");
+            selectLinuxArch(defines, false);
          }
          else
          {
             defines.set("toolchain","mac");
             defines.set("macos","macos");
             defines.set("apple","apple");
-            defines.set("BINDIR", arm64 ? "MacArm64" : m64 ? "Mac64":"Mac");
+            selectMacArch(defines, false);
          }
       }
    }
@@ -2402,30 +2500,6 @@ class BuildTool
       {
          Log.error("Could not find include file \"" + inName + "\"");
          //throw "Could not find include file " + name;
-      }
-   }
-
-
-
-   static function set64(outDefines:Hash<String>, in64:Bool,isArm64=false)
-   {
-      if (isArm64)
-      {
-         outDefines.set("HXCPP_ARM64","1");
-         outDefines.set("HXCPP_M64","1");
-         outDefines.remove("HXCPP_32");
-      }
-      else if (in64)
-      {
-         outDefines.set("HXCPP_M64","1");
-         outDefines.remove("HXCPP_32");
-         outDefines.remove("HXCPP_ARM64");
-      }
-      else
-      {
-         outDefines.set("HXCPP_M32","1");
-         outDefines.remove("HXCPP_M64");
-         outDefines.remove("HXCPP_ARM64");
       }
    }
 

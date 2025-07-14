@@ -31,7 +31,7 @@
   <flag value="-g" if="HXCPP_DEBUG_LINK"/>
   <flag value="-O2" unless="debug"/>
   <flag value="-arch"/>
-  <flag value="arm64" if="HXCPP_ARM64" />
+  <flag value="${HXCPP_ARCH}" />
   <flag value="-isysroot"/>
   <flag value="${DEVELOPER_DIR}/Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS${TVOS_VER}.sdk"/>
   <!-- <flag value="-miphoneos-version-min=3.0" if="HXCPP_GCC" unless="HXCPP_ARMV7" />
