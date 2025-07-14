@@ -1563,8 +1563,13 @@ class BuildTool
             defines.set("windows_arm_host", "1");
       }
       isMac = (new EReg("mac","i")).match(os);
-      if (isMac)
+      if (isMac) {
          defines.set("mac_host", "1");
+         var arch = getArch();
+         if (arch == "arm64") {
+            defines.set("mac_arm64_host", "1");
+         }
+      }
       isLinux = (new EReg("linux","i")).match(os);
       if (isLinux)
          defines.set("linux_host", "1");
@@ -1926,6 +1931,13 @@ class BuildTool
          defines.set("applewatch","applewatch");
          defines.set("apple","apple");
          defines.set("BINDIR","watchsimulator");
+      }
+      else if (defines.exists("macos"))
+      {
+         defines.set("toolchain", getAppleToolchain(defines, "mac"));
+         defines.set("macos", "macos");
+         defines.set("apple", "apple");
+         defines.set("BINDIR", arm64 ? "MacArm64" : m64 ? "Mac64" : "Mac");
       }
 
       else if (defines.exists("android"))
