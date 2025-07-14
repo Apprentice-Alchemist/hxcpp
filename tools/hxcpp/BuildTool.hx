@@ -1872,6 +1872,14 @@ class BuildTool
       Log.println("");
    }
 
+   function getAppleToolchain(defines: Hash<String>, platform: String): String {
+      if (!defines.exists("HXCPP_APPLE_LEGACY_TOOLCHAIN")) {
+         return "apple";
+      } else {
+         return platform;
+      }
+   }
+
    function setDefaultToolchain(defines:Hash<String>)
    {
       if ( (new EReg("window","i")).match(os) )
@@ -1879,42 +1887,42 @@ class BuildTool
 
       if (defines.exists("iphoneos"))
       {
-         defines.set("toolchain","iphoneos");
+         defines.set("toolchain",getAppleToolchain(defines, "iphoneos"));
          defines.set("iphone","iphone");
          defines.set("apple","apple");
          defines.set("BINDIR","iPhone");
       }
       else if (defines.exists("iphonesim"))
       {
-         defines.set("toolchain","iphonesim");
+         defines.set("toolchain",getAppleToolchain(defines, "iphonesim"));
          defines.set("iphone","iphone");
          defines.set("apple","apple");
          defines.set("BINDIR","iPhone");
       }
       else if (defines.exists("appletvos"))
       {
-         defines.set("toolchain","appletvos");
+         defines.set("toolchain",getAppleToolchain(defines, "appletvos"));
          defines.set("appletv","appletv");
          defines.set("apple","apple");
          defines.set("BINDIR","AppleTV");
       }
       else if (defines.exists("appletvsim"))
       {
-         defines.set("toolchain","appletvsim");
+         defines.set("toolchain",getAppleToolchain(defines, "appletvsim"));
          defines.set("appletv","appletv");
          defines.set("apple","apple");
          defines.set("BINDIR","AppleTV");
       }
       else if (defines.exists("watchos"))
       {
-         defines.set("toolchain","watchos");
+         defines.set("toolchain",getAppleToolchain(defines, "watchos"));
          defines.set("apple","apple");
          defines.set("applewatch","applewatch");
          defines.set("BINDIR","watchos");
       }
       else if (defines.exists("watchsimulator"))
       {
-         defines.set("toolchain","watchsimulator");
+         defines.set("toolchain",getAppleToolchain(defines, "watchsimulator"));
          defines.set("applewatch","applewatch");
          defines.set("apple","apple");
          defines.set("BINDIR","watchsimulator");
@@ -2097,7 +2105,7 @@ class BuildTool
          }
          else
          {
-            defines.set("toolchain","mac");
+            defines.set("toolchain", getAppleToolchain(defines, "mac"));
             defines.set("macos","macos");
             defines.set("apple","apple");
             defines.set("BINDIR", arm64 ? "MacArm64" : m64 ? "Mac64":"Mac");

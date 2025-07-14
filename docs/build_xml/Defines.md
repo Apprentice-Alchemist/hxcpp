@@ -78,6 +78,7 @@ Defines affecting target architecture.
 | *appletvsim*            | Compile for apple tvOS simulator |
 | *watchos*               | Compile for apple watchOS |
 | *watchsimulator*        | Compile for apple watchOS simulator |
+| *ENABLE_BITCODE*        | Enable bitcode (Apple targets only) |
 | *webos*                 | Compile for webOS |
 | *tizen*                 | Compile for Tizen |
 | *blackberry*            | Compile for Blackberry |
