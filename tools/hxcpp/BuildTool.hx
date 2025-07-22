@@ -1166,6 +1166,7 @@ class BuildTool
                        s.mFlags.push(substitute(el.att.name));
                     s.mFlags.push(substitute(el.att.value));
                 case "exe" : s.mExe = substitute((el.att.name));
+                case "section" : createManifester(el, s);
             }
       }
 
@@ -1186,6 +1187,7 @@ class BuildTool
                        s.mFlags.push(substitute(el.att.name));
                     s.mFlags.push(substitute(el.att.value));
                 case "exe" : s.mExe = substitute((el.att.name));
+                case "section" : createStripper(el, s); 
             }
       }
 
