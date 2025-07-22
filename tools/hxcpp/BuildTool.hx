@@ -186,8 +186,6 @@ class BuildTool
             mDefines.set("dll_import_link", mDefines.get("dll_import") );
       }
 
-      setupAppleDirectories(mDefines);
-
       if (isMsvc())
       {
          mDefines.set("isMsvc","1");
@@ -2104,123 +2102,6 @@ class BuildTool
             defines.set("apple","apple");
             defines.set("BINDIR", arm64 ? "MacArm64" : m64 ? "Mac64":"Mac");
          }
-      }
-   }
-
-
-
-   function setupAppleDirectories(defines:Hash<String>)
-   {
-      if (defines.exists("HXCPP_CLEAN_ONLY"))
-         return;
-
-      if (defines.exists("apple") && !defines.exists("DEVELOPER_DIR"))
-      {
-         var developer_dir = ProcessManager.runProcessLine("", "xcode-select", ["--print-path"], true, false);
-         if (developer_dir == null || developer_dir == "" || developer_dir.indexOf ("Run xcode-select") > -1)
-            developer_dir = "/Applications/Xcode.app/Contents/Developer";
-         if (developer_dir == "/Developer")
-            defines.set("LEGACY_XCODE_LOCATION","1");
-         defines.set("DEVELOPER_DIR",developer_dir);
-      }
-
-      if (defines.exists("iphone") && !defines.exists("IPHONE_VER"))
-      {
-         var dev_path = defines.get("DEVELOPER_DIR") + "/Platforms/iPhoneOS.platform/Developer/SDKs/";
-         if (FileSystem.exists(dev_path))
-         {
-            var best="0.0";
-            var files = FileSystem.readDirectory(dev_path);
-            var extract_version = ~/^iPhoneOS(.*).sdk$/;
-            for(file in files)
-            {
-               if (extract_version.match(file))
-               {
-                  var ver = extract_version.matched(1);
-                  if (Std.parseFloat (ver)>Std.parseFloat (best))
-                     best = ver;
-               }
-            }
-            if (best!="0.0")
-               defines.set("IPHONE_VER",best);
-         }
-      }
-
-      if (defines.exists("appletv") && !defines.exists("TVOS_VER"))
-      {
-         var dev_path = defines.get("DEVELOPER_DIR") + "/Platforms/AppleTVOS.platform/Developer/SDKs/";
-         if (FileSystem.exists(dev_path))
-         {
-            var best="0.0";
-            var files = FileSystem.readDirectory(dev_path);
-            var extract_version = ~/^AppleTVOS(.*).sdk$/;
-            for(file in files)
-            {
-               if (extract_version.match(file))
-               {
-                  var ver = extract_version.matched(1);
-                  if (Std.parseFloat (ver)>Std.parseFloat (best))
-                     best = ver;
-               }
-            }
-            if (best!="0.0")
-               defines.set("TVOS_VER",best);
-         }
-      }
-
-
-      if (defines.exists("applewatch") && !defines.exists("WATCHOS_VER"))
-      {
-         var dev_path = defines.get("DEVELOPER_DIR") + "/Platforms/WatchOS.platform/Developer/SDKs/";
-         if (FileSystem.exists(dev_path))
-         {
-            var best="0.0";
-            var files = FileSystem.readDirectory(dev_path);
-            var extract_version = ~/^WatchOS(.*).sdk$/;
-            for(file in files)
-            {
-               if (extract_version.match(file))
-               {
-                  var ver = extract_version.matched(1);
-                  if (Std.parseFloat (ver)>Std.parseFloat (best))
-                     best = ver;
-               }
-            }
-            if (best!="0.0")
-               defines.set("WATCHOS_VER",best);
-         }
-      }
-
-
-      if (defines.exists("macos") && !defines.exists("MACOSX_VER"))
-      {
-         var dev_path = defines.get("DEVELOPER_DIR") + "/Platforms/MacOSX.platform/Developer/SDKs/";
-         if (FileSystem.exists(dev_path))
-         {
-            var best="0.0";
-            var files = FileSystem.readDirectory(dev_path);
-            var extract_version = ~/^MacOSX(.*).sdk$/;
-            for(file in files)
-            {
-               if (extract_version.match(file))
-               {
-                  var ver = extract_version.matched(1);
-                  var split_best = best.split(".");
-                  var split_ver = ver.split(".");
-                  if (Std.parseFloat(split_ver[0]) > Std.parseFloat(split_best[0]) || Std.parseFloat(split_ver[1]) > Std.parseFloat(split_best[1]))
-                     best = ver;
-               }
-            }
-            if (best!="0.0")
-               defines.set("MACOSX_VER",best);
-            else
-               Log.v("Could not find MACOSX_VER!");
-         }
-      }
-
-      if (!FileSystem.exists(defines.get("DEVELOPER_DIR") + "/Platforms/MacOSX.platform/Developer/SDKs/"))
-      {
-         defines.set("LEGACY_MACOSX_SDK","1");
       }
    }
 
