@@ -245,7 +245,7 @@ namespace cpp
    // Variant type neither adds nor releases references counts while holding the value as an id on the stack
    // The Dynamic created here owns the id, and we refer to the Dynamic and use his reference count to keep the id alive
    inline Variant::Variant(const id inObjc) { type=typeObject; valObject = Dynamic(inObjc).mPtr; }
-   #ifdef OBJC_ARC
+   #if __has_feature(objc_arc)
       inline Variant::operator id () const {  return type==typeObject && valObject ? (__bridge id)valObject->__GetHandle() : 0;  }
    #else
       inline Variant::operator id () const {  return type==typeObject && valObject ? (id)valObject->__GetHandle() : 0;  }

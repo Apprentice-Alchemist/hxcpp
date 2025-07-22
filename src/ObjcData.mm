@@ -20,7 +20,7 @@ using namespace hx;
 
 - (void)dealloc {
    GCRemoveRoot(&haxeObject);
-   #ifndef OBJC_ARC
+   #if !__has_feature(objc_arc)
    [super dealloc];
    #endif
 }
@@ -184,7 +184,7 @@ public:
 
    ObjcData(const id inValue) : mValue(inValue) 
    {
-      #ifndef OBJC_ARC
+      #if !__has_feature(objc_arc)
       [ inValue retain ];
       #endif
       mFinalizer = new hx::InternalFinalizer(this,clean);
@@ -195,7 +195,7 @@ public:
       ObjcData *m = dynamic_cast<ObjcData *>(inObj);
       if (m)
       {
-         #ifndef OBJC_ARC
+         #if !__has_feature(objc_arc)
          [m->mValue release];
          #else
          m->mValue = nil;
@@ -215,7 +215,7 @@ public:
 
    // k_cpp_objc
    int __GetType() const { return vtAbstractBase + 4; }
-   #ifdef OBJC_ARC
+   #if __has_feature(objc_arc)
    void * __GetHandle() const { return (__bridge void *) mValue; }
    #else
    void * __GetHandle() const { return (void *) mValue; }
@@ -239,7 +239,7 @@ public:
       {
         void *r = inRHS->__GetHandle();
 
-        #ifdef OBJC_ARC
+        #if __has_feature(objc_arc)
         void * ptr = (__bridge void *) mValue;
         #else
         void * ptr = (void *) mValue;
@@ -249,7 +249,7 @@ public:
       }
    }
 
-   #ifdef OBJC_ARC
+   #if __has_feature(objc_arc)
    id mValue;
    #else
    const id mValue;
