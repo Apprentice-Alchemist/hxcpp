@@ -25,6 +25,8 @@
 
 	<flag value="-framework" if="macos"/>
 	<flag value="Security" if="macos"/>
+	<flag value="-framework" if="macos"/>
+	<flag value="CoreFoundation" if="macos"/>
 </target>
 
 </xml>
