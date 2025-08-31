@@ -69,7 +69,7 @@ jobs:
       - name: run (utf8)
         run: bin${{ inputs.sep }}cpp-utf8${{ inputs.sep }}TestMain-debug
       - name: run (neko)
-        if: inputs.arch == '64'
+        if: inputs.arch == '64' && inputs.os != 'macos-latest'
         working-directory: test/cffi/bin/neko
         run: neko TestMain.n
 
