@@ -326,7 +326,12 @@ void __hxcpp_exit(int inExitCode)
 
 double  __time_stamp()
 {
-#ifdef HX_WINDOWS
+#if __cplusplus >= 201103L
+   auto point = std::chrono::system_clock::now();
+   using duration_type = std::chrono::duration<double>;
+   auto duration = std::chrono::duration_cast<duration_type>(point.time_since_epoch());
+   return duration.count();
+#elif defined(HX_WINDOWS)
    static __int64 t0=0;
    static double period=0;
    __int64 now;
@@ -357,7 +362,12 @@ double  __time_stamp()
 
 ::cpp::Int64 __time_stamp_ms()
 {
-#ifdef HX_WINDOWS
+#if __cplusplus >= 201103L
+   auto point = std::chrono::system_clock::now();
+   auto duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(point.time_since_epoch());
+   return duration.count();
+#elif defined(HX_WINDOWS)
     // MSDN states that QueryPerformanceCounter will always succeed on XP and above, so I'm ignoring the result.
     auto now = LARGE_INTEGER{ 0 };
     QueryPerformanceCounter(&now);

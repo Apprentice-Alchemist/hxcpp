@@ -41,7 +41,51 @@
 #undef RegisterClass
 #endif
 
-#if defined(HX_WINDOWS)
+#if __cplusplus >= 201103L
+#include <thread>
+#include <mutex>
+
+struct HxMutex
+{
+   bool mValid;
+   std::recursive_mutex *mMutex;
+
+   HxMutex(): mValid(true), mMutex(new std::recursive_mutex()) {}
+   ~HxMutex() { Clean(); }
+   void Lock() { mMutex->lock(); }
+   void Unlock() { mMutex->unlock(); }
+   bool TryLock() { return !mMutex->try_lock(); }
+   bool IsValid() { return mValid; }
+   void Clean()
+   {
+      if (mValid)
+      {
+         mValid = false;
+      }
+      if (mMutex)
+      {
+         delete mMutex;
+         mMutex = nullptr;
+      }
+   }
+};
+
+#define THREAD_FUNC_TYPE void *
+#define THREAD_FUNC_RET return 0;
+
+#include <system_error>
+
+inline bool HxCreateDetachedThread(void *(*func)(void *), void *param)
+{
+   try {
+      std::thread t(func, param);
+      t.detach();
+      return true;
+   } catch(std::system_error e) {
+      return false;
+   }
+}
+#elif defined(HX_WINDOWS)
 
 
 struct HxMutex
@@ -158,8 +202,83 @@ struct TAutoLock
 
 typedef TAutoLock<HxMutex> AutoLock;
 
+#if __cplusplus >= 201103L
+#include <condition_variable>
 
-#if defined(HX_WINDOWS)
+#define HX_THREAD_SEMAPHORE_LOCKABLE
+
+struct HxSemaphore
+{
+   HxMutex mMutex;
+   std::condition_variable_any *mCondition;
+   bool mSet;
+
+   HxSemaphore()
+   {
+      mSet = false;
+      mCondition = new std::condition_variable_any();
+   }
+   ~HxSemaphore() { Clean(); }
+   // For autolock
+   inline operator HxMutex &() { return mMutex; }
+   void Set()
+   {
+      AutoLock lock(mMutex);
+      if (!mSet)
+      {
+         mSet = true;
+         mCondition->notify_one();
+      }
+   }
+   void QSet()
+   {
+      mSet = true;
+      mCondition->notify_one();
+   }
+   void Reset()
+   {
+      AutoLock lock(mMutex);
+      mSet = false;
+   }
+   void QReset() { mSet = false; }
+   void Wait()
+   {
+      AutoLock lock(mMutex);
+      while (!mSet)
+         mCondition->wait(*mMutex.mMutex);
+      mSet = false;
+   }
+   // when we already hold the mMutex lock ...
+   void QWait()
+   {
+      while (!mSet)
+         mCondition->wait(*mMutex.mMutex);
+      mSet = false;
+   }
+   // Returns true if the wait was success, false on timeout.
+   bool WaitSeconds(double inSeconds)
+   {
+
+      // AutoLock lock(mMutex);
+      std::lock_guard<std::recursive_mutex> lock(*mMutex.mMutex);
+      auto rel_time = std::chrono::duration<double, std::ratio<1, 1>>(inSeconds);
+      auto abs_time = std::chrono::steady_clock::now() + rel_time;
+      while (!mSet && mCondition->wait_until(*mMutex.mMutex, abs_time) != std::cv_status::no_timeout) {}
+      bool wasSet = mSet;
+      mSet = false;
+      return wasSet;
+   }
+   void Clean()
+   {
+      mMutex.Clean();
+      if (mCondition)
+      {
+         delete mCondition;
+         mCondition = nullptr;
+      }
+   }
+};
+#elif defined(HX_WINDOWS)
 
 struct HxSemaphore
 {
@@ -313,8 +432,11 @@ struct HxSemaphore
 
 #endif
 
-
-#if defined HX_WINRT
+#if __cplusplus >= 201103L
+inline void HxSleep(unsigned int ms) {
+   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+#elif defined HX_WINRT
 
 inline void HxSleep(unsigned int ms)
 {
