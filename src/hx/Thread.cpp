@@ -3,27 +3,12 @@
 #include <hx/Thread.h>
 #include <time.h>
 
-DECLARE_TLS_DATA(class hxThreadInfo, tlsCurrentThread);
+class hxThreadInfo;
 
-// g_threadInfoMutex allows atomic access to g_nextThreadNumber
-static HxMutex g_threadInfoMutex;
+thread_local hxThreadInfo *tlsCurrentThread;
+
 // Thread number 0 is reserved for the main thread
-static int g_nextThreadNumber = 1;
-
-
-// How to manage hxThreadInfo references for non haxe threads (main, extenal)?
-// HXCPP_THREAD_INFO_PTHREAD - use pthread api
-// HXCPP_THREAD_INFO_LOCAL - use thread_local storage
-// HXCPP_THREAD_INFO_SINGLETON - use one structure for all threads. Not ideal.
-
-#if __cplusplus > 199711L && !defined(__BORLANDC__)
-   #define HXCPP_THREAD_INFO_LOCAL
-#elif defined (HXCPP_PTHREADS)
-   #define HXCPP_THREAD_INFO_PTHREAD
-#else
-   #define HXCPP_THREAD_INFO_SINGLETON
-#endif
-
+static std::atomic_int g_nextThreadNumber(1);
 
 // --- Deque ----------------------------------------------------------
 
@@ -284,9 +269,7 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
     #ifdef EMSCRIPTEN
     return hx::Throw( HX_CSTRING("Threads are not supported on Emscripten") );
     #else
-    g_threadInfoMutex.Lock();
     int threadNumber = g_nextThreadNumber++;
-    g_threadInfoMutex.Unlock();
 
 	hxThreadInfo *info = new hxThreadInfo(inStart, threadNumber);
 
@@ -308,20 +291,6 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
     #endif
 }
 
-#ifdef HXCPP_THREAD_INFO_PTHREAD
-static pthread_key_t externThreadInfoKey;;
-static pthread_once_t key_once = PTHREAD_ONCE_INIT;
-static void destroyThreadInfo(void *i)
-{
-   hx::Object **threadRoot = (hx::Object **)i;
-   hx::GCRemoveRoot(threadRoot);
-   delete threadRoot;
-}
-static void make_key()
-{
-   pthread_key_create(&externThreadInfoKey, destroyThreadInfo);
-}
-#elif defined(HXCPP_THREAD_INFO_LOCAL)
 struct ThreadInfoHolder
 {
    hx::Object **threadRoot;
@@ -339,26 +308,13 @@ struct ThreadInfoHolder
    
 };
 static thread_local ThreadInfoHolder threadHolder;
-#else
-static hx::Object **sMainThreadInfoRoot = 0;
-#endif
 
 static hxThreadInfo *GetCurrentInfo(bool createNew = true)
 {
 	hxThreadInfo *info = tlsCurrentThread;
 	if (!info)
    {
-      #ifdef HXCPP_THREAD_INFO_PTHREAD
-      pthread_once(&key_once, make_key);
-      hxThreadInfo **pp = (hxThreadInfo **)pthread_getspecific(externThreadInfoKey);
-      if (pp)
-         info = *pp;
-      #elif defined(HXCPP_THREAD_INFO_LOCAL)
       info = threadHolder.get();
-      #else
-      if (sMainThreadInfoRoot)
-      info = (hxThreadInfo *)*sMainThreadInfoRoot;
-      #endif
    }
 
 	if (!info && createNew)
@@ -369,13 +325,7 @@ static hxThreadInfo *GetCurrentInfo(bool createNew = true)
       hx::Object **threadRoot = new hx::Object *;
       *threadRoot = info; 
 		hx::GCAddRoot(threadRoot);
-      #ifdef HXCPP_THREAD_INFO_PTHREAD
-      pthread_setspecific(externThreadInfoKey, threadRoot);
-      #elif defined(HXCPP_THREAD_INFO_LOCAL)
       threadHolder.set(threadRoot);
-      #else
-      sMainThreadInfoRoot = threadRoot;
-      #endif
 	}
 	return info;
 }
