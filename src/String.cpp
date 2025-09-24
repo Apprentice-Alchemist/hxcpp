@@ -72,7 +72,7 @@ static String *sCharToString[1088] = { 0 };
 
 typedef Hash<TNonGcStringSet> StringSet;
 static StringSet *sPermanentStringSet = 0;
-static volatile int sPermanentStringSetMutex = 0;
+static std::atomic_int sPermanentStringSetMutex(0);
 
 #ifdef HXCPP_COMBINE_STRINGS
 static bool sIsIdent[256];
@@ -1172,8 +1172,13 @@ const ::String &::String::makePermanent() const
    {
       unsigned int myHash = hash();
       {
-         while(_hx_atomic_compare_exchange(&sPermanentStringSetMutex, 0, 1) != 0)
+         while(true) {
+            int desired = 0;
+            if(sPermanentStringSetMutex.compare_exchange_strong(desired, 1)) {
+               break;
+            }
             __hxcpp_gc_safe_point();
+         }
          TNonGcStringSet *element = sPermanentStringSet->find(myHash ,  *this);
          sPermanentStringSetMutex = 0;
          if (element)
@@ -1198,8 +1203,15 @@ const ::String &::String::makePermanent() const
          const_cast<String *>(this)->__s = s;
       }
 
-      while(_hx_atomic_compare_exchange(&sPermanentStringSetMutex, 0, 1) != 0)
+      while (true)
+      {
+         int desired = 0;
+         if (sPermanentStringSetMutex.compare_exchange_strong(desired, 1))
+         {
+            break;
+         }
          __hxcpp_gc_safe_point();
+      }
       sPermanentStringSet->set(*this,null());
       sPermanentStringSetMutex = 0;
    }
