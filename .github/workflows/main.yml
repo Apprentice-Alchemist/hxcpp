@@ -56,7 +56,7 @@ jobs:
       arch: Arm64
       sep: /
       ext: .dylib
-      os: macos-latest
+      os: macos-26
 
   Linux32:
     strategy:
