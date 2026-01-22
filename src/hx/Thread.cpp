@@ -6,6 +6,7 @@
 #include <hx/thread/RecursiveMutex.hpp>
 #include <atomic>
 #include <chrono>
+#include <thread>
 
 DECLARE_TLS_DATA(class hxThreadInfo, tlsCurrentThread);
 
@@ -253,7 +254,7 @@ public:
 };
 
 
-THREAD_FUNC_TYPE hxThreadFunc( void *inInfo )
+void hxThreadFunc( void *inInfo )
 {
    // info[1] will the the "top of stack" - values under this
    //  (ie info[0] and other stack values) will be in the GC conservative range
@@ -283,8 +284,6 @@ THREAD_FUNC_TYPE hxThreadFunc( void *inInfo )
 	hx::UnregisterCurrentThread();
 
 	tlsCurrentThread = 0;
-
-	THREAD_FUNC_RET
 }
 
 
@@ -299,22 +298,20 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
     #else
 	int threadNumber = g_nextThreadNumber.fetch_add(1, std::memory_order_relaxed);
 
-	hxThreadInfo *info = new hxThreadInfo(inStart, threadNumber);
+		hxThreadInfo *info = new hxThreadInfo(inStart, threadNumber);
 
-	hx::GCPrepareMultiThreaded();
-	hx::EnterGCFreeZone();
+		try {
+			hx::GCPrepareMultiThreaded();
+			hx::AutoGCFreeZone zone;
+			std::thread t(hxThreadFunc, (void*)info);
+			t.detach();
+			info->mSemaphore->Wait();
+			info->CleanSemaphore();
+		} catch (...) {
+			info->CleanSemaphore();
+			throw Dynamic( HX_CSTRING("Could not create thread") );
+		}
 
-    bool ok = HxCreateDetachedThread(hxThreadFunc, info);
-    if (ok)
-    {
-       info->mSemaphore->Wait();
-    }
-
-    hx::ExitGCFreeZone();
-    info->CleanSemaphore();
-
-    if (!ok)
-       throw Dynamic( HX_CSTRING("Could not create thread") );
     return info;
     #endif
 }
