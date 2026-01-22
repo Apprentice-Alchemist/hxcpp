@@ -1,0 +1,63 @@
+#ifdef __has_include
+#if __has_include(<version>)
+#include <version>
+
+#ifdef __cpp_lib_latch
+#include <latch>
+namespace utils {
+using latch = std::latch;
+}
+#endif
+#endif
+#endif
+
+#if !defined(__cpp_lib_latch)
+#include <condition_variable>
+#include <limits>
+#include <mutex>
+namespace utils {
+class latch {
+  public:
+   static constexpr ptrdiff_t max() noexcept {
+      return std::numeric_limits<ptrdiff_t>::max();
+   }
+
+   explicit latch(ptrdiff_t expected) : counter(expected) {}
+   ~latch() {}
+
+   latch(const latch&) = delete;
+   latch& operator=(const latch&) = delete;
+
+   void count_down(ptrdiff_t update = 1) {
+      std::unique_lock<std::mutex> lock(m);
+      counter -= update;
+      if (counter <= 0) {
+         c.notify_all();
+      }
+   }
+   bool try_wait() noexcept {
+      std::unique_lock<std::mutex> lock(m);
+      return this->counter <= 0;
+   }
+   void wait() {
+      std::unique_lock<std::mutex> lock(m);
+      c.wait(lock, [this]() { return this->counter <= 0; });
+   }
+   void arrive_and_wait(ptrdiff_t update = 1) {
+      std::unique_lock<std::mutex> lock(m);
+      counter -= update;
+      if (counter <= 0) {
+         c.notify_all();
+         return;
+      } else {
+         c.wait(lock, [this]() { return this->counter <= 0; });
+      }
+   }
+
+  private:
+   std::mutex m;
+   std::condition_variable c;
+   ptrdiff_t counter;
+};
+}  // namespace utils
+#endif
