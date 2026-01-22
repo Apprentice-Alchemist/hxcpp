@@ -1,6 +1,5 @@
 #include <hxcpp.h>
 
-#include <hx/Thread.h>
 #include <hx/thread/ConditionVariable.hpp>
 #include <hx/thread/RecursiveMutex.hpp>
 #include <atomic>
@@ -9,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <utils/latch>
+#include <utils/semaphore>
 
 static thread_local class hxThreadInfo *tlsCurrentThread = nullptr;
 
@@ -353,39 +353,18 @@ void __hxcpp_mutex_release(Dynamic inMutex)
 	mutex->release();
 }
 
-#if defined(HX_LINUX) || defined(HX_ANDROID)
-#define POSIX_SEMAPHORE
-#include <semaphore.h>
-#endif
-
-#if defined(HX_MACOS) || defined(IPHONE) || defined(APPLETV)
-#define APPLE_SEMAPHORE
-#include <dispatch/dispatch.h>
-#endif
-
 class hxSemaphore : public hx::Object {
-public:
   hx::InternalFinalizer *mFinalizer;
-#ifdef HX_WINDOWS
-  HANDLE sem;
-#elif defined (POSIX_SEMAPHORE)
-  sem_t sem;
-#elif defined(APPLE_SEMAPHORE)
-	dispatch_semaphore_t sem;
-#endif
-  bool valid;
-
+  utils::counting_semaphore<> *sem;
+public:
   hxSemaphore(int value) {
-    mFinalizer = new hx::InternalFinalizer(this);
-    mFinalizer->mFinalizer = clean;
-#ifdef HX_WINDOWS
-    sem = CreateSemaphoreW(NULL, value, 0x7FFFFFFF, NULL);
-#elif defined(POSIX_SEMAPHORE)
-    sem_init(&sem, 0, value);
-#elif defined(APPLE_SEMAPHORE)
-    sem = dispatch_semaphore_create(value);
-#endif
-    valid = true;
+     mFinalizer = new hx::InternalFinalizer(this, [](hx::Object* inObj) {
+        hxSemaphore* s = dynamic_cast<hxSemaphore*>(inObj);
+		if (s) {
+			delete s->sem;
+		}
+     });
+     sem = new utils::counting_semaphore<>(value);
   }
 
   HX_IS_INSTANCE_OF enum { _hx_ClassId = hx::clsIdSemaphore };
@@ -396,70 +375,17 @@ public:
 
   void Acquire() {
 	hx::EnterGCFreeZone();
-#if HX_WINDOWS
-	WaitForSingleObject(sem, INFINITE);
-#elif defined(POSIX_SEMAPHORE)
-    sem_wait(&sem);
-#elif defined(APPLE_SEMAPHORE)
-    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
-#endif
+	sem->acquire();
 	hx::ExitGCFreeZone();
   }
 
   bool TryAcquire(double timeout) {
 	hx::AutoGCFreeZone blocking;
-#ifdef HX_WINDOWS
-    return WaitForSingleObject(sem, (DWORD)((FLOAT)timeout * 1000.0)) == 0;
-#elif defined(POSIX_SEMAPHORE)
-    if (timeout == 0) {
-      return sem_trywait(&sem) == 0;
-    } else {
-      struct timeval tv;
-      struct timespec t;
-      double delta = timeout;
-      int idelta = (int)delta, idelta2;
-      delta -= idelta;
-      delta *= 1.0e9;
-      gettimeofday(&tv, NULL);
-      delta += tv.tv_usec * 1000.0;
-      idelta2 = (int)(delta / 1e9);
-      delta -= idelta2 * 1e9;
-      t.tv_sec = tv.tv_sec + idelta + idelta2;
-      t.tv_nsec = (long)delta;
-      return sem_timedwait(&sem, &t) == 0;
-    }
-#elif defined(APPLE_SEMAPHORE)
-    return dispatch_semaphore_wait(
-               sem,
-               dispatch_time(DISPATCH_TIME_NOW,
-                             (int64_t)(timeout * 1000 * 1000 * 1000))) == 0;
-#else
-	return false;
-#endif
+	return sem->try_acquire_for(std::chrono::duration<double>(timeout));
   }
 
   void Release() {
-#if HX_WINDOWS
-	ReleaseSemaphore(sem, 1, NULL);
-#elif defined(POSIX_SEMAPHORE)
-    sem_post(&sem);
-#elif defined(APPLE_SEMAPHORE)
-    dispatch_semaphore_signal(sem);
-#endif
-  }
-
-  static void clean(hx::Object *inObj) {
-    hxSemaphore *l = dynamic_cast<hxSemaphore *>(inObj);
-    if (l) {
-      if(l->valid) {
-#ifdef HX_WINDOWS
-		CloseHandle(l->sem);
-#elif defined(POSIX_SEMAPHORE)
-		  sem_destroy(&l->sem);
-#endif
-		  l->valid = false;
-	  }
-    }
+	sem->release();
   }
 };
 
