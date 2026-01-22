@@ -5,6 +5,7 @@
 #include <hx/thread/ConditionVariable.hpp>
 #include <hx/thread/RecursiveMutex.hpp>
 #include <atomic>
+#include <chrono>
 
 DECLARE_TLS_DATA(class hxThreadInfo, tlsCurrentThread);
 
@@ -635,12 +636,23 @@ void __hxcpp_condition_broadcast(Dynamic inCond)
 
 class hxLock : public hx::Object
 {
+	std::mutex *mutex;
+	std::condition_variable *cond;
+	int mAvailable;
+	hx::InternalFinalizer *mFinalizer;
 public:
-
 	hxLock()
 	{
-		mFinalizer = new hx::InternalFinalizer(this);
-		mFinalizer->mFinalizer = clean;
+		mutex = new std::mutex;
+		cond = new std::condition_variable;
+		mFinalizer = new hx::InternalFinalizer(this, [](hx::Object *inObj) {
+			hxLock *l = dynamic_cast<hxLock *>(inObj);
+			if (l)
+			{
+				delete l->mutex;
+				delete l->cond;
+			}
+		});
 	}
 
    HX_IS_INSTANCE_OF enum { _hx_ClassId = hx::clsIdLock };
@@ -649,75 +661,37 @@ public:
 	void __Visit(hx::VisitContext *__inCtx) { mFinalizer->Visit(__inCtx); }
    #endif
 
-	hx::InternalFinalizer *mFinalizer;
-
-	#if defined(HX_WINDOWS) || defined(__SNC__)
-	double Now()
+	 bool Wait(double inTimeout)
 	{
-		return (double)clock()/CLOCKS_PER_SEC;
-	}
-	#else
-	double Now()
-	{
-		struct timeval tv;
-		gettimeofday(&tv,0);
-		return tv.tv_sec + tv.tv_usec*0.000001;
-	}
-	#endif
-
-	static void clean(hx::Object *inObj)
-	{
-		hxLock *l = dynamic_cast<hxLock *>(inObj);
-		if (l)
-		{
-			l->mNotEmpty.Clean();
-			l->mAvailableLock.Clean();
-		}
-	}
-	bool Wait(double inTimeout)
-	{
-		double stop = 0;
-		if (inTimeout>=0)
-			stop = Now() + inTimeout;
-		while(1)
-		{
-			mAvailableLock.Lock();
-			if (mAvailable)
-			{
+		auto until = std::chrono::steady_clock::now() + std::chrono::duration<double>(inTimeout);
+		auto pred = [this]() {
+			if (mAvailable > 0) {
 				--mAvailable;
-		      if (mAvailable>0)
-               mNotEmpty.Set();
-				mAvailableLock.Unlock();
+				if (mAvailable > 0) {
+					cond->notify_one();
+				}
 				return true;
 			}
-			mAvailableLock.Unlock();
-			double wait = 0;
-			if (inTimeout>=0)
-			{
-				wait = stop-Now();
-				if (wait<=0)
-					return false;
-			}
+			return false;
+		};
 
-			hx::EnterGCFreeZone();
-			if (inTimeout<0)
-				mNotEmpty.Wait( );
-			else
-				mNotEmpty.WaitSeconds(wait);
-			hx::ExitGCFreeZone();
+		hx::AutoGCFreeZone zone;
+		std::unique_lock<std::mutex> lock(*mutex);
+		if (inTimeout < 0) {
+			cond->wait(lock, pred);
+			return true;
+		} else {
+			return cond->wait_until(lock, until, pred);
 		}
 	}
+
 	void Release()
 	{
-		AutoLock lock(mAvailableLock);
+		hx::AutoGCFreeZone zone;
+		std::unique_lock<std::mutex> lock(*mutex);
 		mAvailable++;
-		mNotEmpty.Set();
+		cond->notify_one();
 	}
-
-
-	HxSemaphore mNotEmpty;
-   HxMutex     mAvailableLock;
-	int         mAvailable;
 };
 
 
