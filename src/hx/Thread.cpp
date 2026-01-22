@@ -1,12 +1,13 @@
 #include <hxcpp.h>
 
 #include <hx/Thread.h>
-#include <time.h>
 #include <hx/thread/ConditionVariable.hpp>
 #include <hx/thread/RecursiveMutex.hpp>
 #include <atomic>
 #include <chrono>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 static thread_local class hxThreadInfo *tlsCurrentThread = nullptr;
 
@@ -15,27 +16,29 @@ static std::atomic_int g_nextThreadNumber(1);
 
 // --- Deque ----------------------------------------------------------
 
-struct Deque : public Array_obj<Dynamic>
+class Deque : public Array_obj<Dynamic>
 {
-	Deque() : Array_obj<Dynamic>(0,0) { }
+	std::mutex *mutex;
+	std::condition_variable *cond;
+	hx::InternalFinalizer *mFinalizer;
+
+public:
+	Deque() : Array_obj<Dynamic>(0,0) {
+		mutex = new std::mutex;
+		cond = new std::condition_variable;
+	}
 
 	static Deque *Create()
 	{
 		Deque *result = new Deque();
-		result->mFinalizer = new hx::InternalFinalizer(result,clean);
+		result->mFinalizer = new hx::InternalFinalizer(result,[](hx::Object *inObj) {
+			Deque *d = dynamic_cast<Deque *>(inObj);
+			if (d) {
+				delete d->cond;
+				delete d->mutex;
+			};
+		});
 		return result;
-	}
-	static void clean(hx::Object *inObj)
-	{
-		Deque *d = dynamic_cast<Deque *>(inObj);
-		if (d) d->Clean();
-	}
-	void Clean()
-	{
-		#ifdef HX_WINDOWS
-		mMutex.Clean();
-		#endif
-		mSemaphore.Clean();
 	}
 
    #ifdef HXCPP_VISIT_ALLOCS
@@ -46,86 +49,39 @@ struct Deque : public Array_obj<Dynamic>
 	}
    #endif
 
-
-	#ifndef HX_THREAD_SEMAPHORE_LOCKABLE
-	HxMutex     mMutex;
 	void PushBack(Dynamic inValue)
 	{
 		hx::EnterGCFreeZone();
-		AutoLock lock(mMutex);
+		std::unique_lock<std::mutex> lock(*mutex);
 		hx::ExitGCFreeZone();
-
 		push(inValue);
-		mSemaphore.Set();
+		cond->notify_one();
 	}
+
 	void PushFront(Dynamic inValue)
 	{
 		hx::EnterGCFreeZone();
-		AutoLock lock(mMutex);
+		std::unique_lock<std::mutex> lock(*mutex);
 		hx::ExitGCFreeZone();
-
 		unshift(inValue);
-		mSemaphore.Set();
+		cond->notify_one();
 	}
 
-	
 	Dynamic PopFront(bool inBlock)
 	{
 		hx::EnterGCFreeZone();
-		AutoLock lock(mMutex);
-		if (!inBlock)
-		{
-			hx::ExitGCFreeZone();
-			return shift();
-		}
-		// Ok - wait for something on stack...
-		while(!length)
-		{
-			mSemaphore.Reset();
-			lock.Unlock();
-			mSemaphore.Wait();
-			lock.Lock();
+		std::unique_lock<std::mutex> lock(*mutex);
+		if (inBlock) {
+			cond->wait(lock, [this] { return this->length > 0; });
 		}
 		hx::ExitGCFreeZone();
-		if (length==1)
-			mSemaphore.Reset();
-		return shift();
-	}
-	#else
-	void PushBack(Dynamic inValue)
-	{
-		hx::EnterGCFreeZone();
-		AutoLock lock(mSemaphore);
-		hx::ExitGCFreeZone();
-		push(inValue);
-		mSemaphore.QSet();
-	}
-	void PushFront(Dynamic inValue)
-	{
-		hx::EnterGCFreeZone();
-		AutoLock lock(mSemaphore);
-		hx::ExitGCFreeZone();
-		unshift(inValue);
-		mSemaphore.QSet();
-	}
-
-	
-	Dynamic PopFront(bool inBlock)
-	{
-		hx::EnterGCFreeZone();
-		AutoLock lock(mSemaphore);
-		while(inBlock && !length)
-			mSemaphore.QWait();
-		hx::ExitGCFreeZone();
-		Dynamic result =  shift();
-		if (length)
-			mSemaphore.QSet();
+		Dynamic result = shift();
+		if (length > 0) {
+			// notify next waiter
+			cond->notify_one();
+		}
 		return result;
 	}
-	#endif
-
-	hx::InternalFinalizer *mFinalizer;
-	HxSemaphore mSemaphore;
 };
 
 Dynamic __hxcpp_deque_create()
