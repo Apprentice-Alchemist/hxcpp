@@ -8,6 +8,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <utils/latch>
 
 static thread_local class hxThreadInfo *tlsCurrentThread = nullptr;
 
@@ -133,13 +134,11 @@ public:
 	hxThreadInfo(ThreadFuncType inFunction, int inThreadNumber)
         : mFunction(inFunction), mThreadNumber(inThreadNumber), mTLS(0,0)
 	{
-		mSemaphore = new HxSemaphore;
 		mDeque = Deque::Create();
       HX_OBJ_WB_NEW_MARKED_OBJECT(this);
 	}
 	hxThreadInfo()
 	{
-		mSemaphore = 0;
 		mDeque = Deque::Create();
       HX_OBJ_WB_NEW_MARKED_OBJECT(this);
 	}
@@ -147,11 +146,6 @@ public:
     {
         return mThreadNumber;
     }
-	void CleanSemaphore()
-	{
-		delete mSemaphore;
-		mSemaphore = 0;
-	}
 	void Send(Dynamic inMessage)
 	{
 		mDeque->PushBack(inMessage);
@@ -188,14 +182,13 @@ public:
 
 
 	Array<Dynamic> mTLS;
-	HxSemaphore *mSemaphore;
 	ThreadFuncType mFunction;
    int mThreadNumber;
 	Deque   *mDeque;
 };
 
 
-void hxThreadFunc( void *inInfo )
+void hxThreadFunc(utils::latch *l, hxThreadInfo *inInfo)
 {
    // info[1] will the the "top of stack" - values under this
    //  (ie info[0] and other stack values) will be in the GC conservative range
@@ -208,7 +201,7 @@ void hxThreadFunc( void *inInfo )
 	hx::SetTopOfStack((int *)&info[1], true);
 
 	// Release the creation function
-	info[0]->mSemaphore->Set();
+	l->count_down();
 
     // Call the debugger function to annouce that a thread has been created
     //__hxcpp_dbg_threadCreatedOrTerminated(info[0]->GetThreadNumber(), true);
@@ -240,16 +233,14 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
 	int threadNumber = g_nextThreadNumber.fetch_add(1, std::memory_order_relaxed);
 
 		hxThreadInfo *info = new hxThreadInfo(inStart, threadNumber);
-
+		utils::latch l(1);
 		try {
 			hx::GCPrepareMultiThreaded();
 			hx::AutoGCFreeZone zone;
-			std::thread t(hxThreadFunc, (void*)info);
+			std::thread t(hxThreadFunc, &l, info);
 			t.detach();
-			info->mSemaphore->Wait();
-			info->CleanSemaphore();
+			l.wait();
 		} catch (...) {
-			info->CleanSemaphore();
 			throw Dynamic( HX_CSTRING("Could not create thread") );
 		}
 
