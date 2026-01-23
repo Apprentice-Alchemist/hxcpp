@@ -312,35 +312,5 @@ struct HxSemaphore
 
 
 #endif
-
-
-#if defined HX_WINRT
-
-inline void HxSleep(unsigned int ms)
-{
-	::Sleep(ms);
-}
-
-#elif defined HX_WINDOWS
-
-inline void HxSleep(unsigned int ms)
-{
-	::Sleep(ms);
-}
-
-#else
-
-inline void HxSleep(unsigned int ms)
-{
-   struct timespec t;
-   struct timespec tmp;
-   t.tv_sec = 0;
-   t.tv_nsec = ms * 1000000;
-   nanosleep(&t, &tmp);
-}
-
-#endif
-
-
 #endif
 #endif

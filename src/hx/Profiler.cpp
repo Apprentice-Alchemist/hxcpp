@@ -4,7 +4,8 @@
 #include <hx/Thread.h>
 #include <hx/OS.h>
 #include <mutex>
-
+#include <chrono>
+#include <thread>
 
 #ifdef HX_WINRT
    #define PROFILE_PRINT WINRT_LOG
@@ -219,7 +220,7 @@ private:
         int millis = 1;
 
         while (gThreadRefCount > 0) { 
-            HxSleep(millis);
+            std::this_thread::sleep_for(std::chrono::milliseconds(millis));
 
             int count = gProfileClock + 1;
             gProfileClock = (count < 0) ? 0 : count;
