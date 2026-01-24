@@ -73,15 +73,6 @@ struct HxMutex
    CRITICAL_SECTION mCritSec;
 };
 
-
-#define THREAD_FUNC_TYPE DWORD WINAPI
-#define THREAD_FUNC_RET return 0;
-
-inline bool HxCreateDetachedThread(DWORD (WINAPI *func)(void *), void *param)
-{
-	return (CreateThread(NULL, 0, func, param, 0, 0) != 0);
-}
-
 #else
 
 struct HxMutex
@@ -119,26 +110,6 @@ struct HxMutex
       }
    }
 };
-
-#define THREAD_FUNC_TYPE void *
-#define THREAD_FUNC_RET return 0;
-
-inline bool HxCreateDetachedThread(void *(*func)(void *), void *param)
-{
-	pthread_t t;
-	pthread_attr_t attr;
-	if (pthread_attr_init(&attr) != 0)
-		return false;
-#ifdef PTHREAD_CREATE_DETACHED
-	if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) != 0)
-		return false;
-#endif
-	if (pthread_create(&t, &attr, func, param) != 0 )
-		return false;
-	if (pthread_attr_destroy(&attr) != 0)
-		return false;
-	return true;
-}
 
 #endif
 

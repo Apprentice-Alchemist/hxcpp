@@ -1,5 +1,6 @@
 #include <hxcpp.h>
 #include <map>
+#include <thread>
 #include <vector>
 #include <hx/Thread.h>
 #include <hx/OS.h>
@@ -50,7 +51,7 @@ public:
         gThreadRefCount += 1;
 
         if (gThreadRefCount == 1) {
-            HxCreateDetachedThread(ProfileMainLoop, 0);
+            std::thread(ProfileMainLoop).detach();
         }
     }
 
@@ -215,7 +216,7 @@ private:
         int childrenPlusSelf;
     };
 
-    static THREAD_FUNC_TYPE ProfileMainLoop(void *)
+    static void ProfileMainLoop()
     {
         int millis = 1;
 
@@ -225,8 +226,6 @@ private:
             int count = gProfileClock + 1;
             gProfileClock = (count < 0) ? 0 : count;
         }
-
-        THREAD_FUNC_RET
     }
 
     String mDumpFile;

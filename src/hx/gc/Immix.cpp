@@ -8,6 +8,7 @@
 #include <hx/Unordered.h>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 
 #ifdef EMSCRIPTEN
    #include <emscripten/stack.h>
@@ -4515,10 +4516,9 @@ public:
       }
    }
 
-   static THREAD_FUNC_TYPE SThreadLoop( void *inInfo )
+   static void SThreadLoop( void *inInfo )
    {
       sGlobalAlloc->ThreadLoop((int)(size_t)inInfo);
-      THREAD_FUNC_RET;
    }
 
    void CreateWorker(int inId)
@@ -4536,7 +4536,7 @@ public:
 
          sThreadSleeping[inId] = false;
 
-         HxCreateDetachedThread(SThreadLoop, info);
+         std::thread(SThreadLoop, info).detach();
       #endif
    }
 
