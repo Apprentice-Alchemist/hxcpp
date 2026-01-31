@@ -1,7 +1,6 @@
 #ifndef HX_GC_H
 #define HX_GC_H
 
-#include <hx/Tls.h>
 #include <stdio.h>
 
 // Under the current scheme (as defined by HX_HCSTRING/HX_CSTRING in hxcpp.h)
@@ -331,7 +330,7 @@ namespace hx
 
 class StackContext;
 
-EXTERN_FAST_TLS_DATA(StackContext, tlsStackContext);
+extern thread_local StackContext* tlsStackContext;
 
 extern StackContext *gMainThreadContext;
 

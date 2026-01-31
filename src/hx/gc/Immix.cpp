@@ -430,8 +430,7 @@ unsigned int gPrevMarkIdMask = ((~0x2f000000) & 0x30000000) | HX_GC_CONST_ALLOC_
 
 void ExitGCFreeZoneLocked();
 
-
-DECLARE_FAST_TLS_DATA(StackContext, tlsStackContext);
+thread_local StackContext* tlsStackContext;
 
 #ifdef HXCPP_SCRIPTABLE
 extern void scriptMarkStack(hx::MarkContext *);
