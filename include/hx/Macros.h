@@ -177,7 +177,6 @@ HXCPP_EXTERN_CLASS_ATTRIBUTES void SetTopOfStack(int *inTopOfStack,bool);
   #else
    // Java Main....
    #include <jni.h>
-   #include <hx/Thread.h>
    #include <android/log.h>
 
    #define HX_BEGIN_MAIN \

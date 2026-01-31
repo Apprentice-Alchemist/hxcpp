@@ -10,7 +10,6 @@
 
    // Java Main....
    #include <jni.h>
-   #include <hx/Thread.h>
    #include <android/log.h>
 
    extern "C" EXPORT_EXTRA void hxcpp_main()

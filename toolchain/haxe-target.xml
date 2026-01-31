@@ -36,7 +36,6 @@
   <depend name="${HXCPP}/include/hx/QuickVec.h"/>
   <depend name="${HXCPP}/include/hx/StringAlloc.h"/>
   <depend name="${HXCPP}/include/hx/Telemetry.h"/>
-  <depend name="${HXCPP}/include/hx/Thread.h"/>
   <depend name="${HXCPP}/include/hx/Object.h"/>
   <depend name="${HXCPP}/include/hx/Anon.h"/>
   <depend name="${HXCPP}/include/hx/Operators.h"/>
@@ -280,5 +279,3 @@
 
 
 </xml>
-
-

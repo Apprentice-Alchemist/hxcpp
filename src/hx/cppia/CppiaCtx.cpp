@@ -1,7 +1,6 @@
 #include <hxcpp.h>
 #include <hx/Scriptable.h>
 #include <hx/GC.h>
-#include <hx/Thread.h>
 #include <stdio.h>
 
 #include "Cppia.h"

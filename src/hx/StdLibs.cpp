@@ -1,7 +1,6 @@
 #include <hxcpp.h>
 #include <hxMath.h>
 #include <hx/Memory.h>
-#include <hx/Thread.h>
 
 #ifdef HX_WINDOWS
 #include <windows.h>

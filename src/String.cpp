@@ -6,7 +6,6 @@
 #include <string>
 #include <hx/Unordered.h>
 #include "hx/Hash.h"
-#include <hx/Thread.h>
 #include <locale>
 
 using namespace hx;

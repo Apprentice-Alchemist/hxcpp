@@ -2,7 +2,6 @@
 #include <map>
 #include <thread>
 #include <vector>
-#include <hx/Thread.h>
 #include <hx/OS.h>
 #include <mutex>
 #include <chrono>

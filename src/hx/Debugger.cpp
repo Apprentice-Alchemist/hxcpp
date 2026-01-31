@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 #include <hx/Debug.h>
-#include <hx/Thread.h>
 #include <hx/OS.h>
 #include <hx/QuickVec.h>
 #include <mutex>

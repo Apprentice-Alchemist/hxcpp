@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 #include <hx/Debug.h>
-#include <hx/Thread.h>
 #include <hx/Telemetry.h>
 #include <hx/Unordered.h>
 #include <hx/OS.h>
