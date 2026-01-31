@@ -14,7 +14,9 @@
 #include <signal.h>
 #endif
 
-
+#if defined(HX_WINDOWS) && !defined(HX_WINRT)
+#include <windows.h>
+#endif
 
 #ifdef HX_WINRT
 #define DBGLOG WINRT_LOG
