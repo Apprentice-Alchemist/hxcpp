@@ -8,6 +8,8 @@
 #include <hx/OS.h>
 #include <hx/QuickVec.h>
 #include <mutex>
+#include <thread>
+#include <utils/semaphore>
 
 // Newer versions of haxe compiler will set these too (or might be null for haxe 3.0)
 static const char **__all_files_fullpath = 0;
@@ -107,13 +109,13 @@ public:
    // Waiting for continue
    bool         mWaiting;
    std::mutex   mWaitMutex;
-   HxSemaphore  mWaitSemaphore;
+   utils::binary_semaphore  mWaitSemaphore;
    int          mContinueCount;
    bool         mAttached;
 
 
 
-   DebuggerContext(StackContext *inStack)
+   DebuggerContext(StackContext *inStack): mWaitSemaphore(0)
    {
       mStackContext = inStack;
       reset();
@@ -211,6 +213,8 @@ public:
         }
         gMutex.unlock();
 
+        // TODO: all this should probably use a condition variable
+
         // Now wait no longer than 2 seconds total for all threads to
         // be stopped.  If any thread times out, then stop immediately.
         int size = threadNumbers.size();
@@ -219,7 +223,6 @@ public:
         // waiting.  If there were good portable time APIs easily available
         // within hxcpp I'd use them ...
         int timeSlicesLeft = 20;
-        HxSemaphore timeoutSem;
         int i = 0;
         while (i < size) {
             gMutex.lock();
@@ -240,9 +243,8 @@ public:
                 // The 2 seconds have expired, give up
                 return;
             }
-            // Sleep for 1/10 of a second on a semaphore that will never
-            // be Set.
-            timeoutSem.WaitSeconds(0.100);
+            // Sleep for 1/10 of a second
+            std::this_thread::sleep_for(std::chrono::duration<float>(0.100));
             timeSlicesLeft -= 1;
             // Don't increment i, try the same thread again
         }
@@ -263,7 +265,7 @@ public:
         if (mWaiting) {
             mWaiting = false;
             mContinueCount = count - 1;
-            mWaitSemaphore.Set();
+            mWaitSemaphore.release();
         }
 
         mWaitMutex.unlock();
@@ -304,7 +306,7 @@ public:
            while (mWaiting) {
                mWaitMutex.unlock();
                hx::EnterGCFreeZone();
-               mWaitSemaphore.Wait();
+               mWaitSemaphore.acquire();
                hx::ExitGCFreeZone();
                mWaitMutex.lock();
            }

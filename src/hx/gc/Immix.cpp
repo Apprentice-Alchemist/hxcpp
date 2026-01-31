@@ -2,13 +2,13 @@
 
 #include <hx/GC.h>
 #include <hx/Memory.h>
-#include <hx/Thread.h>
 #include "../Hash.h"
 #include "GcRegCapture.h"
 #include <hx/Unordered.h>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <utils/semaphore>
 
 #ifdef EMSCRIPTEN
    #include <emscripten/stack.h>
@@ -5783,8 +5783,8 @@ class LocalAllocator : public hx::StackContext
 
    #ifndef HXCPP_SINGLE_THREADED_APP
    bool            mGCFreeZone;
-   HxSemaphore     mReadyForCollect;
-   HxSemaphore     mCollectDone;
+   utils::binary_semaphore     mReadyForCollect;
+   utils::binary_semaphore     mCollectDone;
    #endif
 
    int             mID;
@@ -5800,7 +5800,7 @@ public:
    int             mStackLocks;
 
 public:
-   LocalAllocator(int *inTopOfStack=0)
+   LocalAllocator(int *inTopOfStack=0): mReadyForCollect(0), mCollectDone(0)
    {
       Reset();
 
@@ -5841,7 +5841,7 @@ public:
       // It is in the free zone - wait for 'SetTopOfStack' to activate
       #ifndef HXCPP_SINGLE_THREADED_APP
       mGCFreeZone = true;
-      mReadyForCollect.Set();
+      mReadyForCollect.release();
       #endif
       sGlobalAlloc->AddLocal(this);
    }
@@ -6033,8 +6033,8 @@ public:
       if (sgIsCollecting)
          CriticalGCError("Bad Allocation while collecting - from finalizer?");
 
-      mReadyForCollect.Set();
-      mCollectDone.Wait();
+      mReadyForCollect.release();
+      mCollectDone.acquire();
       #endif
    }
 
@@ -6052,7 +6052,7 @@ public:
       #endif
 
       mGCFreeZone = true;
-      mReadyForCollect.Set();
+      mReadyForCollect.release();
       #endif
    }
 
@@ -6085,7 +6085,7 @@ public:
          CriticalGCError("GCFree Zone mismatch");
 
       std::lock_guard<std::mutex> lock(*gThreadStateChangeLock);
-      mReadyForCollect.Reset();
+      mReadyForCollect.try_acquire();
       mGCFreeZone = false;
       #endif
    }
@@ -6093,7 +6093,7 @@ public:
    void ExitGCFreeZoneLocked()
    {
       #ifndef HXCPP_SINGLE_THREADED_APP
-      mReadyForCollect.Reset();
+      mReadyForCollect.try_acquire();
       mGCFreeZone = false;
       #endif
    }
@@ -6131,7 +6131,7 @@ public:
          #else
          spaceEnd = 0;
          #endif
-         mReadyForCollect.Wait();
+         mReadyForCollect.acquire();
       }
       #endif
    }
@@ -6140,7 +6140,7 @@ public:
    {
       #ifndef HXCPP_SINGLE_THREADED_APP
       if (!mGCFreeZone)
-         mCollectDone.Set();
+         mCollectDone.release();
       #endif
    }
 
